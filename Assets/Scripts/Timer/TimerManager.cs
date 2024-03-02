@@ -142,6 +142,7 @@ public class TimerManager
             }
         }
         targetSolt.AddLast(task);
+        task.UpdateSoltInfo(targetSolt, targetSolt.Last);
     }
 
     /*
@@ -166,10 +167,9 @@ public class TimerManager
     {
         var expireTime = timer.ExpireTime;
         var idx = expireTime - m_Jiffies;      // 定时器超时时间差
-        LinkedList<TimerTask> targetSolt = null;
+        LinkedList<TimerTask> targetSolt;
         if (idx < k_TWRSize)
         {
-            var tmp = CalcExpireRWheelIndex(expireTime);
             targetSolt = m_TWArray[0].SoltArray[CalcExpireRWheelIndex(expireTime) - 1];
         }
         else if (idx < 0)
@@ -177,25 +177,34 @@ public class TimerManager
             // 可能是加入了一个在当前时间之前的定时器，或者当前设置的定时器过期时间与jiffies相等
             targetSolt = m_TWArray[0].SoltArray[CalcExpireRWheelIndex(m_Jiffies) - 1];
         }
-        else if (idx > 0xffffffffL)
+        else if (idx < 1 << (k_TWRBits + k_TWNBits))
         {
-            // 定时器过期时间超过该时间轮的最大限制
-            idx = 0xffffffffL;
-            expireTime = m_Jiffies + idx;
-
-            targetSolt = m_TWArray[k_TWLevel - 1].SoltArray[CalcExpireWheelIndex(expireTime, 3) - 1];
+            var i = (expireTime >> k_TWRBits) & k_TWNMask;
+            targetSolt = m_TWArray[1].SoltArray[i];
+        }
+        else if (idx < 1 << (k_TWRBits + 2 * k_TWNBits))
+        {
+            var i = (expireTime >> (k_TWRBits + k_TWNBits)) & k_TWNMask;
+            targetSolt = m_TWArray[2].SoltArray[i];
+        }
+        else if (idx < 1 << (k_TWRBits + 3 * k_TWNBits))
+        {
+            var i = (expireTime >> k_TWRBits + 2 * k_TWNBits) & k_TWNMask;
+            targetSolt = m_TWArray[3].SoltArray[i];
         }
         else
         {
-            for (int i = 0; i < k_TWLevel - 1; i++)
+            // 定时器过期时间超过该时间轮的最大限制
+            if (idx > 0xffffffffL)
             {
-                if (idx < 1 << (k_TWRBits + (i + 1) * k_TWNBits))
-                {
-                    targetSolt = m_TWArray[i + 1].SoltArray[CalcExpireWheelIndex(expireTime, i) - 1];
-                    break;
-                }
+                idx = 0xffffffffL;
+                expireTime = m_Jiffies + idx;
             }
+
+            var i = (expireTime >> k_TWRBits + 3 * k_TWNBits) & k_TWNMask;
+            targetSolt = m_TWArray[4].SoltArray[i];
         }
+        
         targetSolt.AddLast(timer);
         timer.UpdateSoltInfo(targetSolt, targetSolt.Last);
     }
