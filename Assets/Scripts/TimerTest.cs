@@ -19,6 +19,7 @@ public class MainEntrance : MonoBehaviour
 
         AddTimerTest();
         RemoveTimerTest();
+        ModifyTimerTest();
 
         // 定时器开启之后5s一次性加入大量定时器
         TimerManager.Instance.SetDelay(5, (_) => AddManyTimerOneTime());
@@ -56,14 +57,15 @@ public class MainEntrance : MonoBehaviour
     // 新增定时器测试
     private void AddTimerTest()
     {
-        TimerManager.Instance.AddTimer(1, -1, (userData) => {
+        TimerManager.Instance.AddTimer(1, -1, (userData) =>
+        {
             Debug.Log("正在执行一个时间间隔为1s的定时器，回调中带自定义参数：" + userData[0] + "，" + userData[1]);
         }, new object[2]{ 10, 12 });
     }
 
     private void RemoveTimerTest()
     {
-        var timerTask = TimerManager.Instance.AddTimer(2, -1, (userData) =>
+        var timerTask = TimerManager.Instance.AddTimer(2, -1, (_) =>
         {
             Debug.Log("正在执行一个定时器，在10s之后会被删除");
         });
@@ -72,9 +74,12 @@ public class MainEntrance : MonoBehaviour
         });
     }
 
-    // TODO
     private void ModifyTimerTest()
     {
-
+        var timerTask = TimerManager.Instance.AddTimer(5, -1, (_) =>
+        {
+            Debug.Log("正在执行一个定时器ModifyTimer，在20s之后会被修改属性");
+        });
+        TimerManager.Instance.SetDelay(20, (_) => TimerManager.Instance.ModifyTimer(timerTask, 8, 20));
     }
 }

@@ -53,7 +53,7 @@ public class TimerTask
         m_Callback?.Invoke(m_UserData);
         m_CurInvokeTimes++;
         m_ExpireTime = TimerManager.Instance.Jiffies + m_Interval;
-        return CheckLoop();
+        return CheckLoop();;
     }
 
     private bool CheckLoop()

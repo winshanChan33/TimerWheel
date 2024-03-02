@@ -6,6 +6,7 @@ using System.Collections.Generic;
 
 public class ObjectPool<T> where T : new()
 {
+    private const int k_MaxCnt = 1 << 8;
     private readonly Stack<T> m_Objects;
 
     public ObjectPool()
@@ -25,6 +26,7 @@ public class ObjectPool<T> where T : new()
 
     public void Return(T obj)
     {
-        m_Objects.Push(obj);
+        if (m_Objects.Count < k_MaxCnt)
+            m_Objects.Push(obj);
     }
 }

@@ -218,6 +218,9 @@ public class TimerManager
     */
     public void UpdateProcess(int userTick = 1)
     {
+        if (userTick <= 0)
+            throw new ArgumentException("时间轮推进长度tick数值不合法");
+
         if (!m_IsRunning) return;
 
         TimerUpdate(userTick);
@@ -232,6 +235,12 @@ public class TimerManager
     */
     public TimerTask AddTimer(float interval, int loopTimes = -1, Action<object[]> callback = null, object[] userData = null)
     {
+        if (interval <= 0)
+            throw new ArgumentException("定时器过期时间跨度不能为0或负数");
+
+        if (loopTimes != -1 && loopTimes < 0)
+            throw new ArgumentException("定时器执行次数参数异常，可选-1或者大于0的整形");
+
         var timerTask = m_TaskInstancePool.Get();
         timerTask.InitTimer(interval, 0, loopTimes, callback, userData);
         InternalAddTimer(timerTask);
@@ -246,6 +255,9 @@ public class TimerManager
     */
     public void SetDelay(float delay, Action<object[]> callback, object[] userData = null)
     {
+        if (delay <= 0)
+            throw new ArgumentException("延迟间隔参数不合法");
+
         AddTimer(delay, 0, callback, userData);
     }
 
@@ -254,6 +266,9 @@ public class TimerManager
     */
     public void RemoveTimer(TimerTask task)
     {
+        if (task is null)
+            throw new ArgumentNullException("无效定时器对象");
+
         if (task.RemoveSelf())          // 内部检测合法性，外部无需关注该对象是否仍然有效
         {
             m_TaskInstancePool.Return(task);
@@ -269,6 +284,15 @@ public class TimerManager
     */
     public void ModifyTimer(TimerTask task, float interval, int loopTimes, Action<object[]> callback = null, object[] userData = null)
     {
+        if (task is null)
+            throw new ArgumentNullException("无效定时器对象");
+
+        if (interval <= 0)
+            throw new ArgumentException("定时器过期时间跨度不能为0或负数");
+        
+        if (loopTimes != -1 && loopTimes < 0)
+            throw new ArgumentException("定时器执行次数参数异常，可选-1或者大于0的整形");
+        
         task.ModifyTask(interval, loopTimes, callback, userData);
     }
 
