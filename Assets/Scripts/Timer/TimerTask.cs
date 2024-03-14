@@ -1,50 +1,65 @@
 /*
     定时器任务类
+
+    内部只关注tick，时间运算在外部进行
 */
 
 using System;
-using System.Collections.Generic;
 
 public class TimerTask
 {
     private Action<object[]> m_Callback;    // 单个定时器任务的回调方法
     private object[] m_UserData;            // 用户自定义回调数据
 
-    private long m_ExpireTime;              // 定时器的到期时间
-    public long ExpireTime
-    {
-        get { return m_ExpireTime; }
-    }
-    private long m_Interval;            // 毫秒
-    private int m_LoopTimes;
+    // 定时器唯一ID
+    public int ID { get; private set; }
+    // 定时器的到期tick
+    public long Expire { get; private set; }
+    // 失效标记
+    public bool IsValid { get; set; }
+    // 当前所处槽位下标
+    public int SoltIndex { get; set; }
+
+    private long m_Delay;                   // 延迟tick
+    private int m_Times;                    // 执行次数
     private int m_CurInvokeTimes;
 
-    // 记录当前的槽位信息，用于删除定时器
-    private LinkedList<TimerTask> m_CurSolt;
-    private LinkedListNode<TimerTask> m_CurLinkNode;
-    
     /*
-        param interval：定时器间隔，单位：秒
-        param delay：延迟定时器开启间隔，单位：秒
-        param loopTimes：执行次数，-1则是循环执行，0默认为执行1次，>1则该定时器执行n次
+        param nowTick：定时器当前tick
+        param delayTick：延迟tick
+        param times：执行次数，-1则是循环执行，0默认为执行1次，>1则该定时器执行n次
         param callback：执行回调
         param userData：用户自定义数据数组
     */
-    public void InitTimer(float interval, float delay = 0, int loopTimes = 0, Action<object[]> callback = null, object[] userData = null)
+    public void Init(int id, long nowTick, long delayTick = 0, int times = 0, Action<object[]> callback = null, object[] userData = null)
     {
-        m_Interval = (long)(interval * 1000);
-        m_ExpireTime = TimerManager.Instance.Jiffies + (long)((interval + delay) * 1000);
-        m_LoopTimes = loopTimes;
+        ID = id;
+        Expire = nowTick + delayTick;
+        m_Delay = delayTick;
+        m_Times = times;
         m_CurInvokeTimes = 0;
 
         m_Callback = callback;
         m_UserData = userData;
+
+        IsValid = true;
     }
 
-    public void Recyle()
+    public void Reset()
     {
-        m_CurSolt = null;
-        m_CurLinkNode = null;
+        SoltIndex = -1;
+        Expire = 0;
+        IsValid = false;
+        m_Callback = null;
+        m_UserData = null;
+        m_Delay = 0;
+        m_Times = 1;
+    }
+
+    // 更新到下一次过期tick
+    public void UpdateNextExpire(long nowTick)
+    {
+        Expire = nowTick + m_Delay;
     }
 
     // 定时器过时后，执行定时器任务
@@ -52,55 +67,30 @@ public class TimerTask
     {
         m_Callback?.Invoke(m_UserData);
         m_CurInvokeTimes++;
-        m_ExpireTime = TimerManager.Instance.Jiffies + m_Interval;
-        return CheckLoop();;
+        return CheckInkoveTimes();;
     }
 
-    private bool CheckLoop()
+    private bool CheckInkoveTimes()
     {
-        if (m_LoopTimes <= 1 && m_LoopTimes >= 0)       // 此处loopTimes不可能为负数，在外部做传参校验即可
+        if (m_Times <= 1 && m_Times >= 0)       // 此处loopTimes不可能为负数，在外部做传参校验即可
             return false;
         
-        return m_LoopTimes == -1 || m_CurInvokeTimes <= m_LoopTimes;
+        return m_Times == -1 || m_CurInvokeTimes <= m_Times;
     }
 
-    // 每次加入到槽位链表的时候，记录相关信息
-    public void UpdateSoltInfo(LinkedList<TimerTask> solt, LinkedListNode<TimerTask> node)
+    public void ModifyTimer(int times, Action<object[]> callback, object[] userData)
     {
-        m_CurSolt = solt;
-        m_CurLinkNode = node;
-    }
+        // 标志该定时器失效了
+        if (!IsValid)
+            return;
 
-    public bool RemoveSelf()
-    {
-        if (!IsValid())
-            return false;
-        
-        m_CurSolt.Remove(m_CurLinkNode);
-        Recyle();
-        return true;
-    }
-
-    public void ModifyTask(float interval, int loopTimes, Action<object[]> callback, object[] userData)
-    {
-        if (!IsValid())
-            return;     // 标志该定时器失效了
-
-        m_Interval = (long)(interval * 1000);
-        m_LoopTimes = loopTimes;
-        if (callback != null)
+        if ((times != 0 && times > m_Times) || times == -1)
         {
-            // 回调与参数需要同时修改
-            m_Callback = callback;
-            m_UserData = userData;
+            m_Times = times;
+            m_CurInvokeTimes = 0;       // 清空记录的执行次数，重新计算
         }
-    }
 
-    public bool IsValid()
-    {
-        if (m_CurSolt is null || m_CurLinkNode is null)
-            return false;
-        
-        return true;
+        m_Callback = callback;
+        m_UserData = userData;
     }
 }
